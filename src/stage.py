@@ -133,6 +133,9 @@ class Stage(Gtk.Window):
         self.update_geometry()
         self.move_onscreen()
 
+        if screen.get_n_monitors() != len(self.monitors):
+            self.setup_monitors()
+
         for monitor in self.monitors:
             monitor.update_geometry()
 
@@ -333,33 +336,44 @@ class Stage(Gtk.Window):
         Iterate through the monitors, and create MonitorViews for each one
         to cover them.
         """
-        self.monitors = []
+        n_configured = len(self.monitors)
+        n_available = self.screen.get_n_monitors()
+
         status.Spanned = settings.bg_settings.get_enum("picture-options") == CDesktopEnums.BackgroundStyle.SPANNED
 
         if status.InteractiveDebug or status.Spanned:
             monitors = (self.screen.get_primary_monitor(),)
         else:
-            n = self.screen.get_n_monitors()
             monitors = ()
-            for i in range(n):
+            for i in range(n_available):
                 monitors += (i,)
 
-        for index in monitors:
-            monitor = MonitorView(self.screen, index)
+        if n_configured > 0:
+            if n_configured > n_available:
+                for index in range(n_available, n_configured):
+                    self.destroy_monitor_views(index)
+                    print("destroying monitor index {0}".format(index))
+            elif n_configured < n_available:
+                for index in range(n_configured, n_available):
+                    self.create_monitor(index)
+                    print("adding monitor index {0}".format(index))
+        else:
+            for index in monitors:
+                self.create_monitor(index)
+                print("creating initial monitor {0}".format(index))
+            self.update_monitor_views()
 
-            image = Gtk.Image()
+    def create_monitor(self, index):
+        monitor = MonitorView(self.screen, index)
 
-            singletons.Backgrounds.create_and_set_gtk_image (image,
-                                                             monitor.rect.width,
-                                                             monitor.rect.height)
+        image = Gtk.Image()
+        singletons.Backgrounds.create_and_set_gtk_image (image,
+                                                         monitor.rect.width,
+                                                         monitor.rect.height)
+        monitor.set_initial_wallpaper_image(image)
 
-            monitor.set_initial_wallpaper_image(image)
-
-            self.monitors.append(monitor)
-
-            self.add_child_widget(monitor)
-
-        self.update_monitor_views()
+        self.monitors.append(monitor)
+        self.add_child_widget(monitor)
 
     def on_bg_changed(self, bg):
         """
@@ -702,14 +716,20 @@ class Stage(Gtk.Window):
             if not monitor.get_reveal_child():
                 monitor.reveal()
 
-    def destroy_monitor_views(self):
+    def destroy_monitor_views(self, index=None):
         """
-        Destroy all MonitorViews
+        Destroys all MonitorViews unless a specific index to destroy is provided.
         """
-        for monitor in self.monitors:
-            monitor.kill_plugin()
-            monitor.destroy()
-            del monitor
+        if index is not None:
+            self.monitors[index].kill_plugin()
+            self.monitors[index].destroy()
+            del self.monitors[index]
+        else:
+            for monitor in self.monitors:
+                monitor.kill_plugin()
+                monitor.destroy()
+                del monitor
+            self.monitors = []
 
     def do_motion_notify_event(self, event):
         """
