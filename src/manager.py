@@ -112,6 +112,7 @@ class ScreensaverManager(GObject.Object):
 
                         self.stage.transition_in(transition, self.on_spawn_stage_complete)
                         self.stage.set_message(msg)
+                    self.stage.gdk_filter.start(self.stage)
                     return True
                 else:
                     status.Active = False
@@ -121,6 +122,7 @@ class ScreensaverManager(GObject.Object):
                 return True
         else:
             if self.stage:
+                self.stage.gdk_filter.stop()
                 self.despawn_stage(c.STAGE_DESPAWN_TRANSITION, self.on_despawn_stage_complete)
                 status.focusWidgets = []
             self.grab_helper.release()

@@ -261,8 +261,6 @@ class Stage(Gtk.Window):
 
         self.setup_children()
 
-        self.gdk_filter.start(self)
-
     def move_onscreen(self):
         w = self.get_window()
 
